@@ -33,7 +33,7 @@
 ### 支持的剪贴板类型
 
 | 类型    | 说明                     |
-| ----- | ---------------------- |
+|-------|------------------------|
 | files | Windows 文件列表（CF_HDROP） |
 | image | 图片（CF_DIB → PIL Image） |
 | text  | 文本 / HTML 解析后的纯文本      |
@@ -57,7 +57,7 @@ files  → image → text
 
 对应代码逻辑：
 
-```python
+```
 files 优先
 image 次之
 最后才是 text
@@ -72,7 +72,7 @@ image 次之
 * 认为是 **系统已确认的本地文件**
 * 直接调用：
 
-```python
+```
 os.startfile(path)
 ```
 
@@ -98,7 +98,7 @@ os.startfile(path)
 
 ### 基本结构
 
-```json
+```
 [
   [软件路径, 匹配规则, 参数格式],
   ...
@@ -177,7 +177,7 @@ test@example.com
 ### 示例：URL 提取（只允许 1 个捕获组）
 
 ```regex
-((?:https?://)?[\w.-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)
+((?:https?://)?[\w.-]+\.[a-zA-Z]{2,}(?:/\S*)?)
 ```
 
 说明：
@@ -198,7 +198,7 @@ test@example.com
 
 ### 参数构造方式
 
-```python
+```
 for part in arg_fmt.split():
     args.append(part.replace("{text}", final_text))
 ```
@@ -212,7 +212,7 @@ for part in arg_fmt.split():
 
 ## 八、外部程序启动方式
 
-```python
+```
 subprocess.Popen(
     [soft] + args,
     creationflags=0x08000000
@@ -227,7 +227,7 @@ subprocess.Popen(
 ## 九、典型使用场景
 
 | 剪贴板内容                 | 行为           |
-| --------------------- | ------------ |
+|-----------------------|--------------|
 | `D:\\a.txt`           | 记事本打开文件      |
 | `发给 test@example.com` | Outlook 新建邮件 |
 | `https://example.com` | Edge 打开网页    |
