@@ -234,4 +234,12 @@ subprocess.Popen(
 | 复制图片                  | 弹出图片预览       |
 
 ---
+## 使用方式
+
+```
+pip install requirements.txt
+```
+```
+python main.py
+```
 
