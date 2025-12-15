@@ -1,7 +1,7 @@
 from clipboardReader import get_clipboard, choose_clipboard_item
 from opener import open_with_software
 from config import ensure_config_exists
-
+from hotkey import hotkey_listener
 def main():
     ensure_config_exists()
     items = get_clipboard()
@@ -14,4 +14,11 @@ def main():
         open_with_software(item["content"], item["type"])
 
 if __name__ == "__main__":
-    main()
+    hotkey_listener(main)
+
+
+r'''
+D:\items\project\python_project\ClipboardGo-python\origin.txt
+发给test@example.com好么
+看一下网页www.baidu.com
+'''

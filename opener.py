@@ -5,6 +5,8 @@ from matcher import find_software
 def open_with_software(text, item_type=None):
     if item_type == "files":
         os.startfile(text)
+        print(">>> 打开详情")
+        print("这是本地文件,直接本地打开")
         return
 
     soft, arg_fmt, extracted = find_software(text)
