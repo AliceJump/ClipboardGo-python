@@ -1,13 +1,19 @@
-# ClipboardGo – 工作流程与规则说明
+# ClipboardGo – 工作流程与热键控制完整说明
 
-本文档基于当前最新代码实现，说明 **ClipboardGo** 从读取剪贴板到打开目标程序的完整流程、匹配规则设计，以及参数传递机制。
+本文档基于当前 **最新代码实现**，说明 **ClipboardGo** 从剪贴板读取 → 内容判定 → 规则匹配 → 启动外部程序的完整流程，并补充 **热键控制模块** 的设计与行为。
 
 ---
 
 ## 一、整体工作流程（总览）
 
 ```text
-启动程序
+程序启动
+  ↓
+注册全局热键（hotkey_listener）
+  ↓
+用户按下触发热键
+  ↓
+执行 main()
   ↓
 读取 / 创建 config.json
   ↓
@@ -19,82 +25,154 @@
   ↓
 根据内容类型决定处理方式
   ↓
-匹配配置规则并提取关键文本
+（text）匹配配置规则并提取关键文本
   ↓
 构造启动参数
   ↓
 静默启动外部程序
 ```
 
+ClipboardGo 是 **热键驱动的被动工具**，不会主动监听剪贴板变化，仅在用户明确触发时执行。
+
 ---
 
-## 二、剪贴板读取逻辑
+## 二、热键控制机制（新增）
+
+### 热键定义
+
+| 热键               | 行为                         |
+|------------------|----------------------------|
+| `Ctrl + Alt + V` | 对当前剪贴板内容执行 ClipboardGo 主逻辑 |
+| `Ctrl + Alt + Q` | 停止监听并退出程序                  |
+
+### 设计目标
+
+* 明确用户意图，避免误触发
+* 允许程序长期常驻
+* 保证异常不会导致监听失效
+* 防止高频连按导致重复启动
+
+---
+
+## 三、热键监听实现逻辑
+
+```python
+import keyboard
+import time
+
+_last_trigger = 0
+
+def safe_call(func):
+    def wrapper():
+        try:
+            func()
+        except Exception as e:
+            print("ClipboardGo 执行出错：", e)
+    return wrapper
+
+
+def debounce_call(func, delay=0.3):
+    def wrapper():
+        global _last_trigger
+        now = time.time()
+        if now - _last_trigger < delay:
+            return
+        _last_trigger = now
+        func()
+    return wrapper
+
+
+def hotkey_listener(func):
+    trigger_hotkey = "ctrl+alt+v"
+    stop_hotkey = "ctrl+alt+q"
+
+    print(f"监听热键 {trigger_hotkey} 来调用功能...")
+    print(f"按 {stop_hotkey} 停止监听。")
+
+    wrapped_func = debounce_call(safe_call(func))
+
+    keyboard.add_hotkey(trigger_hotkey, wrapped_func)
+
+    try:
+        keyboard.wait(stop_hotkey)
+    finally:
+        keyboard.unhook_all_hotkeys()
+        print("停止热键按下，退出监听。")
+```
+
+### 关键特性说明
+
+* **异常隔离**：任何异常不会终止热键监听
+* **防抖机制**：默认 300ms 内重复触发会被忽略
+* **干净退出**：退出时解除所有系统级热键钩子
+
+---
+
+## 四、剪贴板读取逻辑
 
 ### 支持的剪贴板类型
 
 | 类型    | 说明                     |
 |-------|------------------------|
 | files | Windows 文件列表（CF_HDROP） |
-| image | 图片（CF_DIB → PIL Image） |
-| text  | 文本 / HTML 解析后的纯文本      |
+| image | 图片（CF_DIB → PIL.Image） |
+| text  | 文本 / HTML 提取后的纯文本      |
 
 ### 文本优先级规则
 
 1. HTML（提取 StartFragment → 转纯文本）
 2. 普通 Unicode 文本
 
-HTML 与文本只会保留 **一个最终 text** 项。
+HTML 与 text 最终只保留 **一个 text 项**。
 
 ---
 
-## 三、剪贴板内容选择策略
+## 五、剪贴板内容选择策略
 
-程序不会同时处理多个类型，而是按以下顺序 **只选择一个最合适的内容**：
+程序 **只会选择一个最合适的内容**，优先级如下：
 
 ```text
-files  → image → text
+files → image → text
 ```
 
-对应代码逻辑：
-
-```
-files 优先
-image 次之
-最后才是 text
-```
+此逻辑集中在 `choose_clipboard_item()` 中，后续流程无需再关心剪贴板的复杂性。
 
 ---
 
-## 四、内容类型对应的处理方式
+## 六、内容类型对应处理方式
 
 ### 1️⃣ files（文件路径）
 
-* 认为是 **系统已确认的本地文件**
+* 认为是系统已确认的本地文件
+* 不参与 config.json 匹配
 * 直接调用：
 
 ```
 os.startfile(path)
 ```
 
-* 不参与 config.json 匹配
+支持多文件批量打开。
 
 ---
 
 ### 2️⃣ image（图片）
 
-* 已在剪贴板读取阶段转换为 `PIL.Image`
-* 仅展示，不参与自动打开逻辑
+* 剪贴板阶段已转换为 `PIL.Image`
+* 当前行为：仅展示
+* 不参与自动打开逻辑
+
+（后续可扩展 OCR / 保存 / 打开图像软件）
 
 ---
 
-### 3️⃣ text（文本 / HTML 提取结果）
+### 3️⃣ text（文本）
 
+* ClipboardGo 的核心智能处理路径
 * 进入 **规则匹配 + 提取流程**
-* 是本项目最核心的智能逻辑
 
 ---
 
-## 五、配置文件（config.json）结构
+## 七、配置文件（config.json）结构
 
 ### 基本结构
 
@@ -105,7 +183,7 @@ os.startfile(path)
 ]
 ```
 
-### 当前默认配置示例
+### 默认配置示例
 
 ```json
 [
@@ -125,7 +203,7 @@ os.startfile(path)
 
 ---
 
-## 六、匹配与提取规则（核心设计）
+## 八、匹配与提取规则（核心设计）
 
 ### 1️⃣ 通配符规则（文件扩展名）
 
@@ -140,17 +218,16 @@ os.startfile(path)
 
 ### 2️⃣ 正则规则（提取型）
 
-#### 关键设计原则
+#### 规则约束
 
 * 使用 `re.search`
-* **最多只允许 1 个捕获组**
-* 该捕获组的内容将作为 `{text}`
+* **最多允许 1 个捕获组**
 
-```text
-无分组 → {text} = 原始文本
-1 个分组 → {text} = 分组内容
->1 分组 → 视为配置错误
-```
+| 正则情况  | `{text}` 值 |
+|-------|------------|
+| 无分组   | 原始文本       |
+| 1 个分组 | 分组内容       |
+| 多个分组  | 视为配置错误     |
 
 ---
 
@@ -160,11 +237,11 @@ os.startfile(path)
 ([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)
 ```
 
-可匹配：
+剪贴板内容：
 
-* `test@example.com`
-* `帮我发给 test@example.com`
-* `请帮忙发给 test@example.com 谢谢`
+```text
+请帮我发给 test@example.com 谢谢
+```
 
 最终 `{text}`：
 
@@ -174,24 +251,19 @@ test@example.com
 
 ---
 
-### 示例：URL 提取（只允许 1 个捕获组）
+### 示例：URL 提取（单捕获组）
 
 ```regex
 ((?:https?://)?[\w.-]+\.[a-zA-Z]{2,}(?:/\S*)?)
 ```
 
-说明：
-
-* 所有内部结构使用 `(?:...)` 非捕获组
-* 外层仅保留一个捕获组
-
 ---
 
-## 七、参数格式化与启动机制
+## 九、参数格式化与启动机制
 
-### 参数格式 `{text}`
+### `{text}` 占位符
 
-* `{text}` 会被替换为：
+* 替换为：
 
   * 捕获组内容（若存在）
   * 否则为原始文本
@@ -203,14 +275,11 @@ for part in arg_fmt.split():
     args.append(part.replace("{text}", final_text))
 ```
 
-⚠️ 注意：
-
-* 当前实现以 **空格拆分参数**
-* 参数中若包含空格，需由目标程序自行容错
+⚠️ 当前以 **空格拆分参数**，复杂参数需目标程序自行处理。
 
 ---
 
-## 八、外部程序启动方式
+## 十、外部程序启动方式
 
 ```
 subprocess.Popen(
@@ -219,27 +288,32 @@ subprocess.Popen(
 )
 ```
 
-* `CREATE_NO_WINDOW`：不弹出命令行窗口
-* 程序为一次性执行，不驻留后台
+* 使用 `CREATE_NO_WINDOW`
+* 程序一次性启动，不驻留后台
 
 ---
 
-## 九、典型使用场景
+## 十一、典型使用场景
 
 | 剪贴板内容                 | 行为           |
 |-----------------------|--------------|
 | `D:\\a.txt`           | 记事本打开文件      |
 | `发给 test@example.com` | Outlook 新建邮件 |
 | `https://example.com` | Edge 打开网页    |
-| 复制图片                  | 弹出图片预览       |
+| 复制图片                  | 图片预览         |
 
 ---
-## 使用方式
+
+## 十二、运行方式
 
 ```
-pip install requirements.txt
+pip install -r requirements.txt
 ```
+
 ```
 python main.py
 ```
 
+---
+
+**ClipboardGo 是一个以“用户意图”为核心的热键工具框架，规则简单、结构清晰、可持续扩展。**

@@ -1,20 +1,41 @@
-from clipboardReader import get_clipboard, choose_clipboard_item
-from opener import open_with_software
-from config import ensure_config_exists
-from hotkey import hotkey_listener
+from utils.clipboardReader import get_clipboard, choose_clipboard_item
+from utils.opener import open_with_software
+from utils.config import ensure_config_exists
+from utils.hotkey import hotkey_listener
+
+
 def main():
+    """
+    剪贴板处理主流程：
+    1. 确保配置文件存在
+    2. 读取剪贴板内容
+    3. 让用户选择要处理的项目
+    4. 根据内容类型调用对应的软件打开
+    """
+
+    # 确保配置文件存在（不存在则创建）
     ensure_config_exists()
+
+    # 获取剪贴板中的所有项目
     items = get_clipboard()
+
+    # 让用户从剪贴板项目中选择一个
     item = choose_clipboard_item(items)
 
+    # 根据选中项目的类型进行处理
     if item["type"] == "files":
+        # 文件类型：逐个文件使用对应软件打开
         for f in item["content"]:
             open_with_software(f, "files")
     else:
+        # 其他类型：直接打开内容
         open_with_software(item["content"], item["type"])
 
+
 if __name__ == "__main__":
+    # 启动热键监听，触发 main 函数
     hotkey_listener(main)
+
 
 
 r'''
