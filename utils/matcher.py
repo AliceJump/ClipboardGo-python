@@ -1,6 +1,6 @@
 import os
 import re
-from utils.config import load_config
+from .config import load_config
 
 
 def is_wildcard_format(fmt: str):

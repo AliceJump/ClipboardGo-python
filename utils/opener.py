@@ -1,18 +1,19 @@
 import os
 import subprocess
-from utils.matcher import find_software
+from .matcher import find_software
 
 
-def open_with_software(text, item_type=None):
+def open_with_software(text, item_type=None, can_not_sys_open=False):
     """
     根据内容类型使用对应的软件打开内容
 
+    :param can_not_sys_open: 不允许直接以本地方式打开文件(例如需要新的第二打开方式)
     :param text: 要打开的文本或文件路径
     :param item_type: 内容类型（如 files）
     """
 
     # 如果是文件类型，直接使用系统默认方式打开
-    if item_type == "files":
+    if item_type == "files" and not can_not_sys_open:
         os.startfile(text)
         print(">>> 打开详情")
         print("这是本地文件，已使用系统默认方式打开")
