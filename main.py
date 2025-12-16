@@ -1,7 +1,11 @@
+import pyperclip
+
 from utils.clipboardReader import get_clipboard, choose_clipboard_item
 from utils.opener import open_with_software
 from utils.config import ensure_config_exists
 from utils.hotkey import hotkey_listener
+from utils.image import open_img_with_func
+from utils.scan import decode_qr
 
 
 def main():
@@ -27,6 +31,15 @@ def main():
         # 文件类型：逐个文件使用对应软件打开
         for f in item["content"]:
             open_with_software(f, "files")
+    elif item['type'] == "image":
+        print("剪贴板包含图片，可扫描处理。")
+        str1=open_img_with_func(item["content"],decode_qr)
+        if str1:
+            pyperclip.copy(str1)
+            print("识别结果:",str1)
+        else:
+            print("识别失败，直接展示")
+            item["content"].show()
     else:
         # 其他类型：直接打开内容
         open_with_software(item["content"], item["type"])
