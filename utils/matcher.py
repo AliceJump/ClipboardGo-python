@@ -13,7 +13,7 @@ def is_wildcard_format(fmt: str):
     return fmt.startswith("*.") and len(fmt) > 2
 
 
-def match_and_extract(text: str, fmt: str):
+def match_and_extract(text: str, fmt: str, only_wildcard_format=False):
     """
     根据给定格式匹配文本，并提取可用内容
 
@@ -30,7 +30,8 @@ def match_and_extract(text: str, fmt: str):
     if is_wildcard_format(fmt):
         matched = os.path.splitext(text)[1].lower() == fmt[1:].lower()
         return matched, text
-
+    if only_wildcard_format:
+        return False, None
     # 正则表达式匹配
     m = re.search(fmt, text)
     if not m:
@@ -41,7 +42,7 @@ def match_and_extract(text: str, fmt: str):
     return True, groups[0] if groups else text
 
 
-def find_software(text: str):
+def find_software(text: str,only_wildcard_format=False):
     """
     根据配置规则查找可用于打开文本的软件
 
@@ -54,7 +55,7 @@ def find_software(text: str):
 
     # 遍历配置文件中的所有匹配规则
     for path, fmt, arg_fmt in load_config():
-        ok, extracted = match_and_extract(text, fmt)
+        ok, extracted = match_and_extract(text, fmt, only_wildcard_format=only_wildcard_format)
         if ok:
             return path, arg_fmt, extracted
 

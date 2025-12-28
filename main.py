@@ -52,7 +52,6 @@ if __name__ == "__main__":
 
 
 r'''
-D:\items\project\python_project\ClipboardGo-python\origin.txt
 发给test@example.com好么
 看一下网页www.baidu.com
 '''
